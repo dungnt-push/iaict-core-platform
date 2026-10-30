@@ -13,10 +13,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h1 style={{ margin: 0, fontSize: '1.4rem' }}>IAICT Core Platform</h1>
             <nav>
-              <a href="/" style={{ marginRight: '1.5rem' }}>Dashboard</a>
-              <a href="/tenants" style={{ marginRight: '1.5rem' }}>Tenants</a>
-              <a href="/producers" style={{ marginRight: '1.5rem' }}>Producers</a>
-              <a href="/subjects" style={{ marginRight: '1.5rem' }}>Subjects</a>
+              <a href="/" style={{ marginRight: '1.2rem' }}>Dashboard</a>
+              <a href="/tenants" style={{ marginRight: '1.2rem' }}>Tenants</a>
+              <a href="/producers" style={{ marginRight: '1.2rem' }}>Producers</a>
+              <a href="/sites" style={{ marginRight: '1.2rem' }}>Sites</a>
+              <a href="/subjects" style={{ marginRight: '1.2rem' }}>Subjects</a>
               <a href="/events">Events</a>
             </nav>
           </div>

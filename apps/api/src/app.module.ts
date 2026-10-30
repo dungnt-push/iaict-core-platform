@@ -4,6 +4,8 @@ import { TenantModule } from './modules/tenant/tenant.module';
 import { ProducerModule } from './modules/producer/producer.module';
 import { SubjectModule } from './modules/subject/subject.module';
 import { EventModule } from './modules/event/event.module';
+import { CurrentStateModule } from './modules/current-state/current-state.module';
+import { SiteModule } from './modules/site/site.module';
 import { HealthController } from './modules/health/health.controller';
 
 @Module({
@@ -13,6 +15,8 @@ import { HealthController } from './modules/health/health.controller';
     ProducerModule,
     SubjectModule,
     EventModule,
+    CurrentStateModule,
+    SiteModule,
   ],
   controllers: [HealthController],
 })
