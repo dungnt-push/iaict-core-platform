@@ -1,0 +1,329 @@
+// IAICT Core Platform - Prisma Schema (Core Domain + Control Plane)
+// Theo SOW v2.0.7-R18: trung lập ngành, Event Ledger, multi-tenant
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== CONTROL PLANE & IDENTITY ====================
+
+model Tenant {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique // subdomain / alias, NOT the immutable ID
+  status      TenantStatus @default(ACTIVE)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Tenant Experience
+  branding    Json?    // logo, colors, favicon, support info...
+  domains     TenantDomain[]
+
+  subscriptions Subscription[]
+  entitlements  Entitlement[]
+  producers     Producer[]
+  sites         Site[]
+  subjects      Subject[]
+  productionCycles ProductionCycle[]
+  events        DomainEvent[]
+
+  @@index([slug])
+}
+
+enum TenantStatus {
+  DRAFT
+  ACTIVE
+  GRACE
+  READ_ONLY
+  SUSPENDED
+  TERMINATED
+}
+
+model TenantDomain {
+  id       String @id @default(uuid())
+  tenantId String
+  hostname String @unique
+  isPrimary Boolean @default(false)
+  type     DomainType // SUBDOMAIN | CUSTOM | ALIAS
+  tlsStatus String?
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+enum DomainType {
+  SUBDOMAIN
+  CUSTOM
+  ALIAS
+}
+
+// ==================== CORE DOMAIN (Neutral) ====================
+
+model AdministrativeUnit {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  level     String   // "province" | "commune" | "locality" (không hard-code số cấp)
+  parentId  String?
+  parent    AdministrativeUnit?  @relation("AdminHierarchy", fields: [parentId], references: [id])
+  children  AdministrativeUnit[] @relation("AdminHierarchy")
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+
+  producers Producer[]
+  sites     Site[]
+}
+
+model OrganizationUnit {
+  id        String @id @default(uuid())
+  tenantId  String
+  code      String
+  name      String
+  type      String // internal org type
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model Producer {
+  id          String   @id @default(uuid())
+  tenantId    String
+  code        String
+  name        String
+  type        ProducerType // HOUSEHOLD | FARM | COOPERATIVE | ENTERPRISE | ...
+  adminUnitId String?
+  status      String   @default("ACTIVE")
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  adminUnit   AdministrativeUnit? @relation(fields: [adminUnitId], references: [id])
+  sites       Site[]
+  subjects    Subject[]
+  cycles      ProductionCycle[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+enum ProducerType {
+  HOUSEHOLD
+  INDIVIDUAL
+  FARM
+  COOPERATIVE
+  ENTERPRISE
+  MANAGEMENT_BOARD
+  OTHER
+}
+
+model Site {
+  id          String @id @default(uuid())
+  tenantId    String
+  producerId  String?
+  adminUnitId String?
+  code        String
+  name        String
+  type        String // farm, warehouse, forest, pond area...
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  producer    Producer? @relation(fields: [producerId], references: [id])
+  adminUnit   AdministrativeUnit? @relation(fields: [adminUnitId], references: [id])
+  productionUnits ProductionUnit[]
+  spatialUnits    SpatialUnit[]
+
+  @@unique([tenantId, code])
+}
+
+model SpatialUnit {
+  id        String @id @default(uuid())
+  siteId    String
+  code      String
+  name      String?
+  geometry  Json?  // GeoJSON (point/line/polygon) - WGS84
+  area      Decimal?
+  attributes Json?
+
+  site      Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  productionUnits ProductionUnit[]
+}
+
+model ProductionUnit {
+  id          String @id @default(uuid())
+  siteId      String
+  spatialUnitId String?
+  code        String
+  name        String?
+  type        String // thửa, chuồng, ao, lô rừng... (alias từ pack)
+  capacity    Json?
+  status      String @default("ACTIVE")
+
+  site        Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  spatialUnit SpatialUnit? @relation(fields: [spatialUnitId], references: [id])
+  subjects    Subject[]
+  cycles      ProductionCycle[]
+}
+
+model Subject {
+  id            String   @id @default(uuid())
+  tenantId      String
+  producerId    String?
+  productionUnitId String?
+  subjectType   SubjectType
+  code          String
+  name          String?
+  attributes    Json?    // extension fields từ Vertical Pack
+  status        String   @default("ACTIVE")
+
+  tenant        Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  producer      Producer? @relation(fields: [producerId], references: [id])
+  productionUnit ProductionUnit? @relation(fields: [productionUnitId], references: [id])
+  cycles        ProductionCycle[]
+  events        DomainEvent[]
+  currentState  CurrentState?
+
+  @@unique([tenantId, code])
+  @@index([tenantId, subjectType])
+}
+
+enum SubjectType {
+  INDIVIDUAL
+  GROUP
+  COHORT
+  POPULATION
+  AREA_BASED_ASSET
+}
+
+model ProductionCycle {
+  id          String @id @default(uuid())
+  tenantId    String
+  producerId  String?
+  productionUnitId String?
+  subjectId   String?
+  code        String
+  name        String?
+  startDate   DateTime?
+  endDate     DateTime?
+  status      String @default("ACTIVE")
+  attributes  Json?
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  producer    Producer? @relation(fields: [producerId], references: [id])
+  productionUnit ProductionUnit? @relation(fields: [productionUnitId], references: [id])
+  subject     Subject? @relation(fields: [subjectId], references: [id])
+  events      DomainEvent[]
+
+  @@unique([tenantId, code])
+}
+
+// ==================== EVENT LEDGER & CURRENT STATE ====================
+
+model DomainEvent {
+  id          String   @id @default(uuid())
+  tenantId    String
+  subjectId   String?
+  cycleId     String?
+  eventType   String   // generic: quantity_change, mortality, sale, harvest, treatment...
+  occurredAt  DateTime
+  recordedAt  DateTime @default(now())
+  actorId     String?
+  payload     Json     // effect, reason, evidence refs, quantity delta...
+  correctionOf String? // for correction events
+  isCorrection Boolean @default(false)
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subject     Subject? @relation(fields: [subjectId], references: [id])
+  cycle       ProductionCycle? @relation(fields: [cycleId], references: [id])
+
+  @@index([tenantId, subjectId, occurredAt])
+  @@index([tenantId, eventType])
+}
+
+model CurrentState {
+  id          String @id @default(uuid())
+  subjectId   String @unique
+  version     Int    @default(1)
+  asOf        DateTime @default(now())
+  state       Json   // quantity, status, location, health summary...
+  lastEventId String?
+
+  subject     Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+}
+
+// ==================== OUTPUT / LOT (Traceability ready) ====================
+
+model OutputLot {
+  id          String @id @default(uuid())
+  tenantId    String
+  code        String
+  quantity    Decimal?
+  unit        String?
+  status      String
+  attributes  Json?
+  // relations to source events / subjects via separate join or payload
+
+  @@unique([tenantId, code])
+}
+
+// ==================== COMMERCIAL (R17 baseline) ====================
+
+model Subscription {
+  id          String @id @default(uuid())
+  tenantId    String
+  planId      String?
+  fundingClass FundingClass
+  lifecycle   LifecycleState @default(DRAFT)
+  payerId     String?
+  startDate   DateTime?
+  endDate     DateTime?
+  recurringAmount Decimal?
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entitlements Entitlement[]
+}
+
+enum FundingClass {
+  FREE
+  FREEMIUM
+  SELF_PAID
+  SPONSORED_PAID
+  COMPLIMENTARY
+}
+
+enum LifecycleState {
+  DRAFT
+  TRIAL
+  ACTIVE
+  GRACE
+  READ_ONLY
+  SUSPENDED
+  TERMINATED
+}
+
+model Entitlement {
+  id          String @id @default(uuid())
+  tenantId    String
+  subscriptionId String?
+  module      String // CORE, IOT, TRACEABILITY, AI, VERTICAL_PACK_01...
+  scopeType   String // TENANT | PRODUCER | SITE
+  scopeId     String?
+  quota       Json?
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
+}
+
+// ==================== VERTICAL PACK REGISTRY ====================
+
+model VerticalPack {
+  id          String @id @default(uuid())
+  packId      String @unique // e.g. "plant-forestry-v1"
+  name        String
+  version     String
+  manifest    Json
+  status      String @default("ACTIVE")
+  createdAt   DateTime @default(now())
+}
+
+// TODO: Activity/Observation, HealthCase, StandardProfile, Evidence, WorkflowInstance...
+// sẽ bổ sung ở các bước tiếp theo

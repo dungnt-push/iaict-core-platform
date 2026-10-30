@@ -1,0 +1,23 @@
+{
+  "name": "iaict-core-platform",
+  "version": "0.1.0-R18",
+  "description": "IAICT Core Platform - Production, Resource & Value Chain Management + Commercial SaaS (multi-tenant, multi-industry)",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "cd apps/api && npm run start:dev",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "db:push": "prisma db push"
+  },
+  "devDependencies": {
+    "prisma": "^5.20.0",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.20.0"
+  }
+}
