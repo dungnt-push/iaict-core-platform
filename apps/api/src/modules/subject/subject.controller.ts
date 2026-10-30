@@ -1,39 +1,25 @@
-import { Controller, Get, Post, Body, Param, Headers } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { Controller, Get, Post, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { SubjectService } from './subject.service';
+import { CreateSubjectDto } from '../../dto';
+import { TenantGuard } from '../../guards/tenant.guard';
 
 @Controller('subjects')
+@UseGuards(TenantGuard)
 export class SubjectController {
-  constructor(private prisma: PrismaService) {}
+  constructor(private service: SubjectService) {}
 
   @Get()
-  async list(@Headers('x-tenant-id') tenantId: string) {
-    return this.prisma.subject.findMany({
-      where: { tenantId },
-      take: 100,
-    });
+  list(@Req() req: any) {
+    return this.service.list(req.tenantId);
   }
 
   @Post()
-  async create(
-    @Headers('x-tenant-id') tenantId: string,
-    @Body() body: { code: string; name?: string; subjectType?: string; producerId?: string },
-  ) {
-    return this.prisma.subject.create({
-      data: {
-        tenantId,
-        code: body.code,
-        name: body.name,
-        subjectType: body.subjectType || 'INDIVIDUAL',
-        producerId: body.producerId,
-      },
-    });
+  create(@Req() req: any, @Body() dto: CreateSubjectDto) {
+    return this.service.create(req.tenantId, dto);
   }
 
   @Get(':id')
-  async get(@Param('id') id: string) {
-    return this.prisma.subject.findUnique({
-      where: { id },
-      include: { currentState: true },
-    });
+  get(@Param('id') id: string) {
+    return this.service.findById(id);
   }
 }

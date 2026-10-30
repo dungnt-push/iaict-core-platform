@@ -1,27 +1,23 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { TenantService } from './tenant.service';
+import { CreateTenantDto } from '../../dto';
 
 @Controller('tenants')
 export class TenantController {
-  constructor(private prisma: PrismaService) {}
+  constructor(private service: TenantService) {}
 
   @Get()
-  async list() {
-    return this.prisma.tenant.findMany({ take: 50 });
+  list() {
+    return this.service.list();
   }
 
   @Post()
-  async create(@Body() body: { name: string; slug: string }) {
-    return this.prisma.tenant.create({
-      data: {
-        name: body.name,
-        slug: body.slug,
-      },
-    });
+  create(@Body() dto: CreateTenantDto) {
+    return this.service.create(dto);
   }
 
   @Get(':id')
-  async get(@Param('id') id: string) {
-    return this.prisma.tenant.findUnique({ where: { id } });
+  get(@Param('id') id: string) {
+    return this.service.findById(id);
   }
 }

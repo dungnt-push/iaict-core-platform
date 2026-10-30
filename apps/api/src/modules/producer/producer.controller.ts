@@ -1,35 +1,25 @@
-import { Controller, Get, Post, Body, Param, Headers } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { Controller, Get, Post, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { ProducerService } from './producer.service';
+import { CreateProducerDto } from '../../dto';
+import { TenantGuard } from '../../guards/tenant.guard';
 
 @Controller('producers')
+@UseGuards(TenantGuard)
 export class ProducerController {
-  constructor(private prisma: PrismaService) {}
+  constructor(private service: ProducerService) {}
 
   @Get()
-  async list(@Headers('x-tenant-id') tenantId: string) {
-    return this.prisma.producer.findMany({
-      where: { tenantId },
-      take: 100,
-    });
+  list(@Req() req: any) {
+    return this.service.list(req.tenantId);
   }
 
   @Post()
-  async create(
-    @Headers('x-tenant-id') tenantId: string,
-    @Body() body: { code: string; name: string; type?: string },
-  ) {
-    return this.prisma.producer.create({
-      data: {
-        tenantId,
-        code: body.code,
-        name: body.name,
-        type: body.type || 'HOUSEHOLD',
-      },
-    });
+  create(@Req() req: any, @Body() dto: CreateProducerDto) {
+    return this.service.create(req.tenantId, dto);
   }
 
   @Get(':id')
-  async get(@Param('id') id: string) {
-    return this.prisma.producer.findUnique({ where: { id } });
+  get(@Param('id') id: string) {
+    return this.service.findById(id);
   }
 }
